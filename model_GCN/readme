@@ -1,0 +1,3 @@
+The checkpoint file can be downloaded at
+1. model_GCN_fixed_full200_guidance_epoch20.pt
+2. model_GCN_fixed_step0_guidance_epoch2000.pt
