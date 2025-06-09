@@ -7,7 +7,7 @@ Generating novel and functional molecules is an essential and challenging task i
 
 ## Dependency
 
-- python3.8
+- python 3.8
 - torch 1.11.0
 - transformers 4.22.2
 
