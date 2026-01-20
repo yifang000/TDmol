@@ -1054,7 +1054,7 @@ class EnVariationalDiffusion(torch.nn.Module):
         _, batch_mol_graph = next(enumerate(torch_geometric.loader.DataLoader(dataset=mol_graph,batch_size=len(mol_graph),shuffle=False)))
         gradient = cond_fn(guidance_kwargs[2],batch_mol_graph,node_mask,t,guidance_kwargs[0],scale,guidance_kwargs[1],prior_network)
         new_mean = (
-            mean.float() + variance * gradient.float()
+            mean.float() - variance * gradient.float()
         )
         if is_visual:
             return new_mean,gradient
