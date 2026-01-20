@@ -851,6 +851,60 @@ class EnVariationalDiffusion(torch.nn.Module):
         return x, h, x_clean, h_clean
 
     @torch.no_grad()
+    def sample_ob_multi_scale(self, n_samples, n_nodes, node_mask, edge_mask, context, fix_noise=False,cond_fn=None, guidance_kwargs=None,prior_network=None):
+        """
+        Draw samples from the generative model with multi scale [0.1,0.2,0.5,1,5].
+        """
+        Lscale = [0.1,0.2,0.5,1,5]
+        if fix_noise:
+            # Noise is broadcasted over the batch axis, useful for visualizations.
+            z = self.sample_combined_position_feature_noise(1, n_nodes, node_mask)
+        else:
+            z = self.sample_combined_position_feature_noise(n_samples, n_nodes, node_mask)
+
+        diffusion_utils.assert_mean_zero_with_mask(z[:, :, :self.n_dims], node_mask)
+
+        #z_clean represents none guidance z
+        z_clean = z
+        z1 = z
+        z2 = z
+        z3 = z
+        z4 = z
+        z5 = z
+
+        # Iteratively sample p(z_s | z_t) for t = 1, ..., T, with s = t - 1.
+        for s in reversed(range(0, self.T)):
+            s_array = torch.full((n_samples, 1), fill_value=s, device=z.device)
+            t_array = s_array + 1
+            s_array = s_array / self.T
+            t_array = t_array / self.T
+
+            z1 = self.sample_p_zs_given_zt(s_array, t_array, z1, node_mask, edge_mask, context, fix_noise=fix_noise,cond_fn=cond_fn, guidance_kwargs=guidance_kwargs,prior_network=prior_network,scale=Lscale[0])
+            z2 = self.sample_p_zs_given_zt(s_array, t_array, z2, node_mask, edge_mask, context, fix_noise=fix_noise,cond_fn=cond_fn, guidance_kwargs=guidance_kwargs,prior_network=prior_network,scale=Lscale[1])
+            z3 = self.sample_p_zs_given_zt(s_array, t_array, z3, node_mask, edge_mask, context, fix_noise=fix_noise,cond_fn=cond_fn, guidance_kwargs=guidance_kwargs,prior_network=prior_network,scale=Lscale[2])
+            z4 = self.sample_p_zs_given_zt(s_array, t_array, z4, node_mask, edge_mask, context, fix_noise=fix_noise,cond_fn=cond_fn, guidance_kwargs=guidance_kwargs,prior_network=prior_network,scale=Lscale[3])
+            z5 = self.sample_p_zs_given_zt(s_array, t_array, z5, node_mask, edge_mask, context, fix_noise=fix_noise,cond_fn=cond_fn, guidance_kwargs=guidance_kwargs,prior_network=prior_network,scale=Lscale[4])
+            z_clean =  self.sample_p_zs_given_zt(s_array, t_array, z_clean, node_mask, edge_mask, context, fix_noise=fix_noise,cond_fn=None, guidance_kwargs=None,prior_network=None)
+
+        # Finally sample p(x, h | z_0).
+        x1, h1 = self.sample_p_xh_given_z0(z1, node_mask, edge_mask, context, fix_noise=fix_noise)
+        x2, h2 = self.sample_p_xh_given_z0(z2, node_mask, edge_mask, context, fix_noise=fix_noise)
+        x3, h3 = self.sample_p_xh_given_z0(z3, node_mask, edge_mask, context, fix_noise=fix_noise)
+        x4, h4 = self.sample_p_xh_given_z0(z4, node_mask, edge_mask, context, fix_noise=fix_noise)
+        x5, h5 = self.sample_p_xh_given_z0(z5, node_mask, edge_mask, context, fix_noise=fix_noise)
+        x_clean,h_clean = self.sample_p_xh_given_z0(z_clean, node_mask, edge_mask, context, fix_noise=fix_noise)
+
+        diffusion_utils.assert_mean_zero_with_mask(x1, node_mask)
+        diffusion_utils.assert_mean_zero_with_mask(x2, node_mask)
+        diffusion_utils.assert_mean_zero_with_mask(x3, node_mask)
+        diffusion_utils.assert_mean_zero_with_mask(x4, node_mask)
+        diffusion_utils.assert_mean_zero_with_mask(x5, node_mask)
+        diffusion_utils.assert_mean_zero_with_mask(x_clean, node_mask)
+
+        return x1,h1, x2,h2, x3,h3, x4,h4, x5,h5, x_clean, h_clean
+
+
+    @torch.no_grad()
     def sample_ob_sim(self, n_samples, n_nodes, node_mask, edge_mask, context, fix_noise=False,cond_fn=None, guidance_kwargs=None,prior_network=None,scale=5.0,epoch=20,start_iter=1000,threshold=0.01):
         """
         Draw samples from the generative model.
